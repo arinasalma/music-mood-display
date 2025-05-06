@@ -7,13 +7,54 @@ from io import BytesIO
 
 # Fungsi-fungsi yang sama seperti sebelumnya
 def kmeans(data, k, max_iter=100):
-    # ... (sama dengan kode Anda sebelumnya)
+    # Inisialisasi centroid secara acak
+    np.random.seed(42)
+    centroids = data[np.random.choice(data.shape[0], k, replace=False)]
+
+    for _ in range(max_iter):
+        # Menghitung jarak ke centroid
+        distances = np.sqrt(((data - centroids[:, np.newaxis])**2).sum(axis=2))
+        # Assign cluster
+        labels = np.argmin(distances, axis=0)
+
+        # Update centroid
+        new_centroids = np.array([data[labels == i].mean(axis=0) for i in range(k)])
+
+        # Cek konvergensi
+        if np.all(centroids == new_centroids):
+            break
+        centroids = new_centroids
+
+    return centroids, labels
 
 def evaluate_clustering(true_labels, pred_labels, classes):
-    # ... (sama dengan kode Anda sebelumnya)
+    confusion = np.zeros((len(classes), len(classes)), dtype=int)
+    for t, p in zip(true_labels, pred_labels):
+        confusion[classes.index(t), classes.index(p)] += 1
 
-def davies_bouldin_score(data, labels, centroids):
-    # ... (sama dengan kode Anda sebelumnya)
+    metrics = {}
+    for i, cls in enumerate(classes):
+        tp = confusion[i,i]
+        fp = confusion[:,i].sum() - tp
+        fn = confusion[i,:].sum() - tp
+        tn = confusion.sum() - tp - fp - fn
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        fdr = fp / (fp + tp) if (fp + tp) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        metrics[cls] = {
+            'precision': precision,
+            'recall': recall,
+            'fdr': fdr,
+            'f1': f1
+        }
+
+    accuracy = np.trace(confusion) / confusion.sum()
+    return confusion, metrics, accuracy
+
+from sklearn.metrics import davies_bouldin_score
 
 def plot_clusters(data, cluster_labels, centroids, cluster_names, actual_labels):
     # Fungsi untuk membuat plot
@@ -105,7 +146,7 @@ def main():
                     # Evaluasi
                     classes = ['angry', 'happy', 'sad', 'chill']
                     confusion_matrix, metrics, accuracy = evaluate_clustering(actual_labels, [cluster_names[label] for label in cluster_labels], classes)
-                    dbi_score = davies_bouldin_score(data, cluster_labels, centroids)
+                    dbi_score = davies_bouldin_score(data, cluster_labels)
                     
                     # Simpan hasil ke session state
                     st.session_state.current_result = {
